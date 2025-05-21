@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Veri Bilimi: Grafik Oluşturma Etkinliği</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2368b8;
+      --accent: #23c486;
+      --soft: #f4f8fb;
+      --card: #fff;
+      --text-dark: #223;
+      --text-light: #7a8;
+      --shadow: 0 4px 32px 0 #afd3fa44;
+      --radius: 20px;
+      --cardpad: 2.2rem;
+    }
+    html, body { height:100%; }
+    body { background: var(--soft); font-family: 'Quicksand', Arial, sans-serif; color: var(--text-dark); margin:0; min-height:100vh;}
+    .container { max-width: 840px; margin: 32px auto 0 auto; padding: 0 10px; }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: var(--cardpad);
+      margin-bottom: 22px;
+      transition: box-shadow 0.2s;
+    }
+    h1 { color: var(--primary); font-size: 2.1rem; font-weight: 700; text-align: center; margin-bottom:8px;}
+    h3 { color: var(--accent); margin-top:0; }
+    .explainer { font-size: 1.16rem; color: #567; background: #f2faf6; border-radius: 13px; padding: 1rem 1.3rem; margin: 0 0 24px 0;}
+    .varlist { background: #e8f4fe; border-radius: 10px; padding: 14px 10px 10px 10px; margin-bottom:14px; box-shadow:0 2px 8px #c8e5fa22;}
+    .varitem { margin: 8px 0; background: #f7faff; border-radius: 8px; padding: 8px 13px; cursor: grab; font-size: 17px; color: var(--primary); box-shadow:0 1px 4px #b5d7fa22;}
+    .varitem.disabled { opacity: 0.38; pointer-events: none;}
+    .dragzone { min-height: 52px; min-width: 130px; border: 2.2px dashed var(--accent); border-radius: 10px; background: #eafff4; margin: 6px 0 18px 0; transition: background 0.3s; display: flex; align-items:center; }
+    .dragzone.active { background: #c5f6e8; }
+    .exLabel { font-weight: 700; color: var(--accent); font-size: 1.1rem; margin-bottom:6px;}
+    .resetbtn { margin: 13px 0 0 0; padding: 10px 22px; border-radius: 11px; border: none; background: var(--primary); color: #fff; font-size: 1.04rem; font-weight: 600; cursor:pointer; box-shadow:0 2px 8px #a0c7fa22; letter-spacing:0.03em;}
+    .resetbtn:hover { background: #14509b;}
+    .infoarea { font-size: 1.05rem; margin: 16px 0 0 0; color:#4895ef;}
+    .wrong { color: #d71331; font-weight: bold;}
+    .correct { color: #19b454; font-weight: bold;}
+    .shake { animation: shake 0.45s; }
+    @keyframes shake {
+      10%, 90% { transform: translateX(-3px); }
+      20%, 80% { transform: translateX(6px); }
+      30%, 50%, 70% { transform: translateX(-10px); }
+      40%, 60% { transform: translateX(10px); }
+    }
+    @media (max-width: 700px) {
+      .container { max-width: 100vw; }
+      .card { padding: 1.1rem;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Veri Bilimi: Grafik Oluşturma Etkinliği</h1>
+    <div class="explainer">
+      <b>Bu etkinlikte:</b> <br>
+      <span style="color:#2368b8;font-weight:600;">Veri görselleştirmenin</span> nasıl yapıldığını adım adım uygulayacaksın.<br>
+      <span style="color:#23c486;">Sürükle-bırak</span> ile eksenlere uygun değişkenleri yerleştir, grafiğin nasıl oluştuğunu gözlemle.<br>
+      Her adımda sana açıklama vereceğim. Yanlış bırakırsan tekrar deneyebilirsin.<br>
+      <b>Hadi başlayalım!</b>
+    </div>
+
+    <div class="card">
+      <h3>1. Grafik Tipini Seç</h3>
+      <select id="graphType" style="padding:8px 16px; border-radius:8px; font-size:1.05rem; background:#f2faf6;">
+        <option value="pie">Pasta Grafiği</option>
+        <option value="bar">Sütun Grafiği</option>
+        <option value="line">Çizgi Grafiği</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <h3>2. Değişkenleri Sürükle & Yerleştir</h3>
+      <div id="descText" style="margin-bottom:12px; font-size:1.08rem; color:#146a54;"></div>
+      <div style="display:flex;gap:22px;flex-wrap:wrap;">
+        <div>
+          <div class="varlist" id="varList"></div>
+          <button class="resetbtn" onclick="resetAll()">Sıfırla</button>
+        </div>
+        <div style="flex:1; min-width:210px;">
+          <div class="exLabel" id="dropName0"></div>
+          <div class="dragzone" id="drop0" ondrop="drop(event,0)" ondragover="allowDrop(event)"></div>
+          <div class="exLabel" id="dropName1"></div>
+          <div class="dragzone" id="drop1" ondrop="drop(event,1)" ondragover="allowDrop(event)"></div>
+        </div>
+      </div>
+      <canvas id="chartCanvas" width="370" height="260" style="margin-top:18px;display:none;background:#fcfcfc;border-radius:14px;"></canvas>
+      <div class="infoarea" id="infoText"></div>
+    </div>
+  </div>
+  <script>
+    // Değişkenler ve açıklamalar
+    const steps = {
+      pie: {
+        desc: `<b>Pasta Grafiği</b> için değişkenleri sırayla bırak:<br>
+          <b>1. Kategori:</b> Ayakkabı Rengi<br>
+          <b>2. Değer:</b> Öğrenci Sayısı`,
+        vars: [
+          {name:"Ayakkabı Rengi",  type:"label"},
+          {name:"Öğrenci Sayısı", type:"value"}
+        ],
+        dropNames: ["Kategori (Ayakkabı Rengi)", "Değer (Öğrenci Sayısı)"],
+        chartData: {
+          labels: ["Beyaz","Siyah","Kırmızı"],
+          vals: [10, 8, 6],
+          colors: ["#f5f5f5","#2d2c2c","#e14646"]
+        }
+      },
+      bar: {
+        desc: `<b>Sütun Grafiği</b> için değişkenleri sırayla bırak:<br>
+          <b>1. X Ekseni:</b> Ay<br>
+          <b>2. Y Ekseni:</b> Yağış (mm)`,
+        vars: [
+          {name:"Ay",  type:"x"},
+          {name:"Yağış (mm)", type:"y"}
+        ],
+        dropNames: ["X Ekseni (Ay)", "Y Ekseni (Yağış mm)"],
+        chartData: {
+          labels: ["Ocak","Şubat","Mart","Nisan","Mayıs","Haz"],
+          vals: [78, 60, 45, 70, 90, 95],
+          colors: ["#6ca0dc","#4cc9f0","#a3cef1","#3f37c9","#4361ee","#5e60ce"]
+        }
+      },
+      line: {
+        desc: `<b>Çizgi Grafiği</b> için değişkenleri sırayla bırak:<br>
+          <b>1. X Ekseni:</b> Gün<br>
+          <b>2. Y Ekseni:</b> Sıcaklık (°C)`,
+        vars: [
+          {name:"Gün",  type:"x"},
+          {name:"Sıcaklık (°C)", type:"y"}
+        ],
+        dropNames: ["X Ekseni (Gün)", "Y Ekseni (Sıcaklık °C)"],
+        chartData: {
+          labels: ["Pzt", "Salı", "Çrş", "Per", "Cuma", "Cmt", "Paz"],
+          vals: [19, 21, 20, 22, 24, 23, 21],
+          colors: ["#23c486"]
+        }
+      }
+    };
+    let currentStep = 0;
+    let chart = null;
+    let selectedVars = [];
+    let currentType = "pie";
+
+    function loadVars() {
+      currentType = document.getElementById("graphType").value;
+      currentStep = 0;
+      selectedVars = [];
+      document.getElementById("infoText").innerHTML = "Sürükle ve uygun değişkeni bırak. Her adımda ne olduğunu gözlemle!";
+      document.getElementById("descText").innerHTML = steps[currentType].desc;
+      document.getElementById("chartCanvas").style.display = "none";
+      document.getElementById("dropName0").innerHTML = steps[currentType].dropNames[0];
+      document.getElementById("dropName1").innerHTML = steps[currentType].dropNames[1];
+      // Vars
+      let varList = document.getElementById("varList");
+      varList.innerHTML = "";
+      for(let v of steps[currentType].vars) {
+        let node = document.createElement("div");
+        node.innerText = v.name;
+        node.className = "varitem";
+        node.draggable = true;
+        node.ondragstart = ev => { ev.dataTransfer.setData("text", v.name); };
+        varList.appendChild(node);
+      }
+      // Drop alanları temizle
+      for(let i=0;i<2;i++) document.getElementById("drop"+i).innerHTML = "";
+      if(chart) { chart.destroy(); chart = null; }
+    }
+    function allowDrop(ev) { ev.preventDefault(); ev.currentTarget.classList.add('active'); }
+    function drop(ev, idx) {
+      ev.preventDefault();
+      ev.currentTarget.classList.remove('active');
+      let vName = ev.dataTransfer.getData("text");
+      // Sıra kontrolü
+      if(vName !== steps[currentType].vars[currentStep].name || idx !== currentStep) {
+        let dropArea = document.getElementById("drop"+idx);
+        dropArea.classList.add("shake");
+        setTimeout(()=>{ dropArea.classList.remove("shake"); }, 500);
+        document.getElementById("infoText").innerHTML = `<span class="wrong">Yanlış değişken ya da sıra! Önce <b>${steps[currentType].vars[currentStep].name}</b> ve doğru yere bırakmalısın.</span>`;
+        return;
+      }
+      // Doğru bırakıldıysa
+      let el = document.createElement("div");
+      el.className = "varitem disabled";
+      el.innerText = vName;
+      document.getElementById("drop"+idx).appendChild(el);
+      // Vars listesinde pasif yap
+      let varItems = document.querySelectorAll("#varList .varitem");
+      for(let item of varItems) if(item.innerText === vName) item.classList.add("disabled");
+      selectedVars.push(vName);
+      currentStep++;
+      stepChart();
+    }
+    function resetAll() { loadVars(); }
+
+    function stepChart() {
+      const data = steps[currentType].chartData;
+      let c = currentStep;
+      let info = "";
+      let chartArea = document.getElementById("chartCanvas");
+      chartArea.style.display = "block";
+      if(chart) { chart.destroy(); chart = null; }
+      if(currentType === "pie") {
+        if(c === 1) {
+          chart = new Chart(chartArea, {
+            type: "pie",
+            data: {
+              labels: [data.labels[0], "", ""],
+              datasets: [{
+                data: [data.vals[0], 0, 0],
+                backgroundColor: [data.colors[0], "#eaeaea", "#eaeaea"]
+              }]
+            }
+          });
+          info = `Kategori bırakıldı, ilk dilim oluştu. <br><span style="color:#767">Pasta grafiği, kategorilere göre oranları gösterir.</span>`;
+        }
+        if(c === 2) {
+          chart = new Chart(chartArea, {
+            type: "pie",
+            data: {
+              labels: data.labels,
+              datasets: [{
+                data: data.vals,
+                backgroundColor: data.colors
+              }]
+            }
+          });
+          info = `<span class='correct'>Tüm değişkenler bırakıldı, pasta grafiği tamamlandı!<br></span><span style="color:#767">Her dilimin büyüklüğü, öğrenci sayısına göre değişir. Görselleştirme tamamlandı!</span>`;
+        }
+      } else if(currentType === "bar") {
+        if(c === 1) {
+          chart = new Chart(chartArea, {
+            type: "bar",
+            data: {
+              labels: data.labels,
+              datasets: [{
+                label: "",
+                data: Array(data.labels.length).fill(0),
+                backgroundColor: "#eaeaea"
+              }]
+            }
+          });
+          info = `X ekseni bırakıldı, ay adları göründü.<br><span style="color:#767">Sütun grafiği, her kategorideki değeri gösterir.</span>`;
+        }
+        if(c === 2) {
+          chart = new Chart(chartArea, {
+            type: "bar",
+            data: {
+              labels: data.labels,
+              datasets: [{
+                label: "Yağış (mm)",
+                data: data.vals,
+                backgroundColor: data.colors
+              }]
+            }
+          });
+          info = `<span class='correct'>Tüm değişkenler bırakıldı, sütun grafiği tamamlandı!<br></span><span style="color:#767">Her sütunun yüksekliği, yağış miktarını gösterir. Görselleştirme tamamlandı!</span>`;
+        }
+      } else if(currentType === "line") {
+        if(c === 1) {
+          chart = new Chart(chartArea, {
+            type: "line",
+            data: {
+              labels: data.labels,
+              datasets: [{
+                label: "",
+                data: Array(data.labels.length).fill(null),
+                borderColor: "#eaeaea",
+                backgroundColor: "#eaeaea",
+                tension: 0.3,
+                fill: false,
+                pointRadius: 4
+              }]
+            }
+          });
+          info = "X ekseni bırakıldı, gün isimleri ve noktalar göründü.<br><span style='color:#767'>Çizgi grafiği, değişimin eğilimini gösterir.</span>";
+        }
+        if(c === 2) {
+          chart = new Chart(chartArea, {
+            type: "line",
+            data: {
+              labels: data.labels,
+              datasets: [{
+                label: "Sıcaklık (°C)",
+                data: data.vals,
+                borderColor: data.colors[0],
+                backgroundColor: "#d2f7e8",
+                tension: 0.3,
+                fill: false,
+                pointRadius: 6
+              }]
+            }
+          });
+          info = `<span class='correct'>Tüm değişkenler bırakıldı, çizgi grafiği tamamlandı!<br></span><span style="color:#767">Çizgi grafiğiyle, sıcaklığın günlere göre nasıl değiştiğini görebilirsin.</span>`;
+        }
+      }
+      if(c === 0) chartArea.style.display = "none";
+      document.getElementById("infoText").innerHTML = info;
+    }
+
+    // Etkinliği başlat
+    window.onload = loadVars;
+    // Grafik tipi değişince sıfırla
+    document.getElementById("graphType").addEventListener("change", resetAll);
+
+  </script>
+</body>
+</html>
+
+
